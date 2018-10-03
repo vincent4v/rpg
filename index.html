@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>RPG Game Thing</title>
+		<style>
+			@keyframes hideController {
+				0% {
+					width: 100vw;
+					height: 100vh;
+					opacity: 1;
+				}
+				100% {
+					width: 0;
+					height: 0;
+					opacity: 0;
+				}
+			}
+			@keyframes showController {
+				0% {
+					width: 0;
+					height: 0;
+					opacity: 0;
+				}
+				100% {
+					width: 100vw;
+					height: 100vh;
+					opacity: 1;
+				}
+			}
+			* {
+				margin: 0;
+				padding: 0;
+				overflow: hidden;
+			}
+			.mobile {
+				display: block;
+				z-index: 100;
+			}
+			#game {
+				background: #09F;
+				height: 100vh;
+				width: 100vw;
+				z-index: 1;
+			}
+			#controller {
+				height: 100vh;
+				left: 0;
+				position: absolute;
+				top: 0;
+				width: 100vw;
+			}
+			#controller_part1 {
+				bottom: 4.1667vw;
+				height: 22.5vw;
+				left: 4.1667vw;
+				position: absolute;
+				width: 22.5vw;
+				text-align: center;
+			}
+			#controller_part1 td, #controller_part2 td {
+				background: rgba(0, 0, 0, 0.2);
+				border: solid 1px black;
+				border-radius: 25%;
+				font-size: 5vw;
+				overflow: hidden;
+				text-align: center;
+				width: 33%;
+			}
+			#controller_part1 td:empty, #controller_part2 td:empty {
+				background: transparent;
+				border: solid 1px transparent;
+			}
+			#controller_part2 {
+				bottom: 4.1667vw;
+				height: 20.5vw;
+				position: absolute;
+				right: 4.1667vw;
+				width: 25.5vw;
+				text-align: center;
+			}
+		</style>
+		<meta name='mobile-web-app-capable' content='yes' />
+		<meta name='apple-mobile-web-app-capable' content='yes' />
+		<meta name='apple-mobile-web-app-status-bar-style' content='black' />
+		<link rel='apple-touch-icon' href='rpg.png' />
+		<link rel='shortcut icon' href='rpg.png' />
+		<link rel='favicon' href='rpg.png' />
+		<link rel='icon' href='rpg.png' />
+		<script>
+			window.onerror = function onerror(a,b,c,d,e) {
+				alert(([a,b,c,d,e]).join('\n'));
+			};
+			function GameInstance(canvas_selector, width, height) {
+				this.render = {
+					width: width,
+					height: height,
+					canvas: document.querySelector(canvas_selector),
+					context: document.querySelector(canvas_selector).getContext('2d')
+				};
+				this._ = {
+					frames: 0,
+					framerate: 24,
+					lastFpsUpdate: new Date().getTime(),
+					
+					DEBUG: !0
+				};
+				this.game = {
+					points: 0
+				};
+				this.keyhandler = function(evt, pressed) {
+					if(!!pressed && evt.ctrlKey) {
+						if(evt.which == 51) {
+							this._.DEBUG = !this._.DEBUG;
+						};
+						if(evt.which == 49 && document.querySelector('.mobile').style.width != '0px') {
+							document.querySelector('.mobile').style.width = '0';
+							document.querySelector('.mobile').style.height = '0';
+							document.querySelector('.mobile').style.animation = '0.3s hideController linear';
+						} else if(evt.which == 49) {
+							document.querySelector('.mobile').style.width = '100vw';
+							document.querySelector('.mobile').style.height = '100vh';
+							document.querySelector('.mobile').style.animation = '0.2s showController linear';
+						};
+					};
+				};
+				this.padding = function padding(num, len) {
+					var n = num.toString();
+					if(n.length > len) {
+						n = "";
+						for(var i = 0; i < len; i++) {
+							n += "9";
+						};
+					} else {
+						while(n.length < len) {
+							n = "0" + n;
+						};
+					};
+					return n;c
+				};
+				this.txt = function txt(x, y, numb, colour, size) {
+					colour = colour || "#FFF";
+					numb = numb.toUpperCase() || "0";
+					x = x || 0;
+					y = y || 0;
+					size = size || 5;
+					var num = {
+						'0': [[1,1,1],[1,0,1],[1,0,1],[1,0,1],[1,1,1]],
+						'1': [[1,1,0],[0,1,0],[0,1,0],[0,1,0],[1,1,1]],
+						'2': [[1,1,1],[0,0,1],[0,1,0],[1,0,0],[1,1,1]],
+						'3': [[1,1,1],[0,0,1],[1,1,1],[0,0,1],[1,1,1]],
+						'4': [[1,0,1],[1,0,1],[1,1,1],[0,0,1],[0,0,1]],
+						'5': [[1,1,1],[1,0,0],[1,1,0],[0,0,1],[1,1,0]],
+						'6': [[0,1,1],[1,0,0],[1,1,1],[1,0,1],[1,1,1]],
+						'7': [[1,1,1],[0,0,1],[0,0,1],[0,1,0],[1,0,0]],
+						'8': [[1,1,1],[1,0,1],[1,1,1],[1,0,1],[1,1,1]],
+						'9': [[1,1,1],[1,0,1],[1,1,1],[0,0,1],[0,1,0]],
+						
+						'A': [[0,1,1],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],
+						'B': [[1,1,0],[1,0,1],[1,1,0],[1,0,1],[1,1,1]],
+						'C': [[0,1,1],[1,0,0],[1,0,0],[1,0,0],[0,1,1]],
+						'D': [[1,1,0],[1,0,1],[1,0,1],[1,0,1],[1,1,0]],
+						'E': [[1,1,1],[1,0,0],[1,1,1],[1,0,0],[1,1,1]],
+						'F': [[1,1,1],[1,0,0],[1,1,1],[1,0,0],[1,0,0]],
+						'G': [[0,1,1],[1,0,0],[1,0,1],[1,0,1],[0,1,1]],
+						'H': [[1,0,1],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],
+						'I': [[1,1,1],[0,1,0],[0,1,0],[0,1,0],[1,1,1]],
+						'J': [[1,1,1],[0,0,1],[0,0,1],[1,0,1],[0,1,0]],
+						'K': [[1,0,0],[1,0,1],[1,1,0],[1,0,1],[1,0,1]],
+						'L': [[1,0,0],[1,0,0],[1,0,0],[1,0,0],[1,1,1]],
+						'M': [[1,1,0,1,0],[1,0,1,0,1],[1,0,1,0,1],[1,0,1,0,1],[1,0,1,0,1]],
+						'N': [[0,0,0],[1,1,0],[1,0,1],[1,0,1],[1,0,1]],
+						'O': [[0,0,0],[1,1,1],[1,0,1],[1,0,1],[1,1,1]],
+						'P': [[1,1,0],[1,0,1],[1,1,1],[1,0,0],[1,0,0]],
+						'Q': [[0,1,0],[1,0,1],[1,0,1],[1,1,0],[0,1,1]],
+						'R': [[1,1,0],[1,0,1],[1,1,1],[1,1,0],[1,0,1]],
+						'S': [[0,1,1],[1,0,0],[0,1,1],[0,0,1],[1,1,0]],
+						'T': [[1,1,1],[0,1,0],[0,1,0],[0,1,0],[0,1,0]],
+						'U': [[1,0,1],[1,0,1],[1,0,1],[1,0,1],[0,1,1]],
+						'V': [[1,0,1],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],
+						'W': [[1,0,1,0,1],[1,0,1,0,1],[1,0,1,0,1],[1,0,1,0,1],[0,1,0,1,0]],
+						'X': [[1,0,1],[1,0,1],[0,1,0],[1,0,1],[1,0,1]],
+						'Y': [[1,0,1],[1,0,1],[1,1,1],[0,1,0],[0,1,0]],
+						'Z': [[1,1,1],[0,0,1],[0,1,0],[1,0,0],[1,1,1]],
+						':': [[0,0,0],[0,1,0],[0,0,0],[0,1,0],[0,0,0]],
+						' ': [[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0]]
+					};
+					this.render.context.save();
+					this.render.context.translate(x,y);
+					var n = numb.toString(10), s = size;
+					var p = 0, line = 0, xPos = 0, xMinus = 0;
+					for(var i = 0; i < n.length; i++) {
+						var number = (n[i] in num) ? (num[n[i]]) : (num[0]); 
+						if((n[i]).match(/(\n|\0)/g)) {
+							line ++;
+							xMinus += x*s+(i*s*4+p*s);
+						} else {
+							for(var y in number) {
+								for(var x in number[y]) {
+									if(number[y][x] != 0) {
+										xPos = x*s+(i*s*4+p*s);
+										this.render.context.fillStyle = colour;
+										this.render.context.fillRect(xPos - xMinus,line*s*6+y*s,s,s);
+									};
+								};
+							};
+							if((n[i]).match(/(M|W)/g)) p += 2;
+						};
+					};
+					this.render.context.restore();
+				};
+				this.frame = function frame() {
+					this._.frames ++;
+					if(this._.lastFpsUpdate < new Date().getTime() - 999) {
+						this._.framerate = this._.frames;
+						this._.frames = 0;
+						this._.lastFpsUpdate = new Date().getTime();
+					};
+					this.render.context.clearRect(0, 0, this.render.width, this.render.height);
+					this.txt(24, 24, "SC0RE: " + this.padding(this.game.points, 8), "#FFF", 8);
+					if(this._.DEBUG) this.txt(24, 72, "FPS  :     " + this.padding(this._.framerate, 4), "#F0FFFA", 8);
+					// this.txt(24, 120, "FPS  :     " + this.padding(this._.framerate, 4), "#F0FFFA", 8);
+				};
+				this.start = function start() {
+					this.render.canvas.width = this.render.width;
+					this.render.canvas.height = this.render.height;
+					window.addEventListener('keydown', (function(e) {
+						this.keyhandler(e, 1);
+					}).bind(this));
+					window.addEventListener('keyup', (function(e) {
+						this.keyhandler(e, 0);
+					}).bind(this));
+					setInterval(this.frame.bind(this));
+				};
+			};
+			window.onload = function onload(e) {
+				var game = new GameInstance('canvas#game', 1280, 800);
+				game.start();
+			};
+		</script>
+	</head>
+	<body>
+		<canvas id='game'></canvas>
+		<div class='mobile' id='controller'>
+			<table id='controller_part1'>
+				<tr>
+					<td></td>
+					<td style='transform:rotate(90deg);-webkit-transform:rotate(90deg)' ontouchstart='controller.up(1)' ontouchend='controller.up(0)'>&#8249;</td>
+					<td></td>
+				</tr>
+				<tr>
+					<td ontouchstart='controller.left(1)' ontouchend='controller.left(0)'>&#8249;</td>
+					<td></td>
+					<td ontouchstart='controller.right(1)' ontouchend='controller.right(0)'>&#8250;</td>
+				</tr>
+				<tr>
+					<td></td>
+					<td style='transform:rotate(-90deg);-webkit-transform:rotate(-90deg)' ontouchstart='controller.down(1)' ontouchend='controller.down(0)'>&#8249;</td>
+					<td></td>
+				</tr>
+			</table>
+			<table id='controller_part2'>
+				<tr></tr>
+				<tr>
+					<td>B</td>
+					<td>A</td>
+				</tr>
+				<tr></tr>
+			</table>
+		</div>
+	</body>
+</html>
