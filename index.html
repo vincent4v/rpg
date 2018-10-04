@@ -90,6 +90,8 @@
 			window.onerror = function onerror(a,b,c,d,e) {
 				alert(([a,b,c,d,e]).join('\n'));
 			};
+		</script>
+		<script>
 			function GameInstance(canvas_selector, width, height) {
 				this.render = {
 					width: width,
@@ -99,43 +101,250 @@
 				};
 				this._ = {
 					frames: 0,
-					framerate: 24,
+					framerate: 0,
 					lastFpsUpdate: new Date().getTime(),
 					
 					DEBUG: !0
 				};
 				this.game = {
-					points: 0
+					points: 0,
+					level: 0,
+					time: {
+						time: "Day",
+						texture: 0
+					},
+					health_points: 100
+				};
+				this.moveSpeed = 8;
+				this.controller = {
+					b: (function b(pressed, keyboard) {
+						if(keyboard == true) {
+							if(pressed) this.player.speeding = !this.player.speeding;
+						} else {
+							this.player.speeding = pressed;
+						};
+						this.moveSpeed = this.player.speeding ? 14 : 8;
+						document.querySelector('#btn_b').style.background = 'rgba(0, ' + (this.player.speeding ? 127 : 0) + ', 0, 0.2)';
+					}).bind(this),
+					a: (function a(pressed) {
+						if(this.game.health_points < 0) {
+							this.resetGameData();
+						};
+						document.querySelector('#btn_a').style.background = 'rgba(0, ' + (pressed ? 127 : 0) + ', 0, 0.2)';
+					}).bind(this),
+					up: (function up(pressed) {
+						this.player.velocity.y = -this.moveSpeed * pressed;
+						document.querySelector('#btn_up').style.background = 'rgba(0, ' + (pressed ? 127 : 0) + ', 0, 0.2)';
+					}).bind(this),
+					left: (function left(pressed) {
+						this.player.velocity.x = -this.moveSpeed * pressed;
+						document.querySelector('#btn_left').style.background = 'rgba(0, ' + (pressed ? 127 : 0) + ', 0, 0.2)';
+					}).bind(this),
+					right: (function right(pressed) {
+						this.player.velocity.x = +this.moveSpeed * pressed;
+						document.querySelector('#btn_right').style.background = 'rgba(0, ' + (pressed ? 127 : 0) + ', 0, 0.2)';
+					}).bind(this),
+					down: (function down(pressed) {
+						this.player.velocity.y = +this.moveSpeed * pressed;
+						document.querySelector('#btn_down').style.background = 'rgba(0, ' + (pressed ? 127 : 0) + ', 0, 0.2)';
+					}).bind(this),
+				};
+				this.Entity = function Entity(x, y, colour) {
+					this.position = {
+						x: x || 0,
+						y: y || 0
+					};
+					this.velocity = {
+						x: 0,
+						y: 0
+					};
+					this.size = {
+						width: 96,
+						height: 128
+					};
+					this.willMove = true;
+					this.speeding = false;
+					this._ = {
+						lastMoved: new Date().getTime()
+					};
+					this.colour = colour || "#09F";
+				};
+				this.Entity.prototype.standingOnCheck = function standingOnCheck(g) {
+					var coords = g.level.convertPosToCoords(this.position.x, this.position.y, g);
+					var velCoord = g.level.convertPosToCoords(this.position.x+this.velocity.x, this.position.y+this.velocity.y, g);
+					var block = g.level.blocks[g.level.arr[Math.floor(coords.y)][Math.floor(coords.x)] || 0];
+					if(block.name == "Grass") {
+						g.game.health_points += (!this.speeding) ? 0.0075 : -0.02;
+					} else if(block.name == "Water") {
+						this.velocity.x /= 1.5;
+						this.velocity.y /= 1.5;
+						g.game.health_points -= 0.035;
+					};
+					var nextBlock = g.level.blocks[g.level.arr[Math.floor(velCoord.y) || 0][Math.floor(velCoord.x)] || 0];
+					this.willMove = !nextBlock.collision;
+					if(g.game.health_points > 100) g.game.health_points = 100;
+				};
+				this.Entity.prototype.show = function(g) {
+					g.render.context.fillStyle = this.colour;
+					var x = g.render.width / 2 - this.size.width/2,
+					    y = g.render.height / 2 - this.size.height/2; //
+					g.render.context.fillStyle = g.level.blocks[2].colour;
+					g.render.context.fillRect(x,y,this.size.width,this.size.height);
+				};
+				this.Entity.prototype.move = function(g) {
+					var timeNow = new Date().getTime();
+					var v = ((timeNow - this._.lastMoved) / 50);
+					this.standingOnCheck(g);
+					if(this.willMove){
+						this.position.x += this.velocity.x * v * (this.speeding ? 1.25 : 1);
+						this.position.y += this.velocity.y * v * (this.speeding ? 1.25 : 1);
+						this.position.x = g.constrain(this.position.x, this.size.width/2, g.level.sizeX * g.level.tileSizeX - this.size.width/2);
+						this.position.y = g.constrain(this.position.y, this.size.height/2, g.level.sizeY * g.level.tileSizeY - this.size.height/2);
+						if(this.velocity.x != 0) this.velocity.x = ((this.velocity.x > 0) ? (1) : (-1)) * g.moveSpeed;
+						if(this.velocity.y != 0) this.velocity.y = ((this.velocity.y > 0) ? (1) : (-1)) * g.moveSpeed;
+					} else {};
+					this._.lastMoved = timeNow;
+				};
+				this.player = new this.Entity(this.render.width, this.render.height, "#0F9");
+				this.constrain = function constrain(num, min, max) {
+					if(num > max) num = max;
+					if(num < min) num = min;
+					return num || 0;
 				};
 				this.keyhandler = function(evt, pressed) {
-					if(!!pressed && evt.ctrlKey) {
-						if(evt.which == 51) {
+					if(!evt.ctrlKey) {
+						if(evt.key == "ArrowLeft" || evt.key == "a" || evt.key == "A") {
+							evt.preventDefault();
+							this.controller.left(pressed+0);
+						} else if(evt.key == "ArrowRight" || evt.key == "d" || evt.key == "D") {
+							evt.preventDefault();
+							this.controller.right(pressed+0);
+						};
+						if(evt.key == "ArrowUp" || evt.key == "w" || evt.key == "W") {
+							evt.preventDefault();
+							this.controller.up(pressed+0);
+						} else if(evt.key == "ArrowDown" || evt.key == "s" || evt.key == "S-") {
+							evt.preventDefault();
+							this.controller.down(pressed+0);
+						};
+						if(evt.key == "Shift") {
+							evt.preventDefault();
+							this.controller.b(pressed+0, true);
+						};
+						if(evt.key == "Space" || evt.key == " " || evt.key == "e" || evt.key == "E") {
+							evt.preventDefault();
+							this.controller.a(pressed+0);
+						};
+					} else if(!!pressed) {
+						if(evt.key == "0") {
+							evt.preventDefault();
+							if(this._.DEBUG) this.resetGameData();
+						};
+						if(evt.key == "3") {
+							evt.preventDefault();
 							this._.DEBUG = !this._.DEBUG;
 						};
-						if(evt.which == 49 && document.querySelector('.mobile').style.width != '0px') {
+						if(evt.key == "1" && document.querySelector('.mobile').style.width != '0px') {
+							evt.preventDefault();
 							document.querySelector('.mobile').style.width = '0';
 							document.querySelector('.mobile').style.height = '0';
 							document.querySelector('.mobile').style.animation = '0.3s hideController linear';
-						} else if(evt.which == 49) {
+						} else if(evt.key == "1") {
+							evt.preventDefault();
 							document.querySelector('.mobile').style.width = '100vw';
 							document.querySelector('.mobile').style.height = '100vh';
 							document.querySelector('.mobile').style.animation = '0.2s showController linear';
 						};
 					};
 				};
-				this.padding = function padding(num, len) {
+				this.Level = function Level(arr, g) {
+					this.arr = arr;
+					this.sizeX = arr[0].length;
+					this.sizeY = arr.length;
+					this.onscreenX = 7;
+					this.onscreenY = 4;
+					this.tileSizeX = (g.render.width / this.onscreenX);
+					this.tileSizeY = (g.render.height / this.onscreenY);
+				};
+				this.Level.prototype.convertPosToCoords = function convertPosToCoords(posX, posY, g) {
+					return {
+						x: Math.floor((posX / g.render.width) * this.onscreenX * 10) / 10,
+						y: Math.floor((posY / g.render.height) * this.onscreenY * 10) / 10
+					};
+				};
+				this.Level.prototype.blocks = {
+					0: {
+						name: "Water",
+						colour: ["#09F", "#039"],
+						collision: false,
+						tileID: 0
+					},
+					1: {
+						name: "Stone",
+						colour: ["#99A", "#445"],
+						collision: true,
+						tileID: 1
+					},
+					2: {
+						name: "Grass",
+						colour: ["#0A3", "#051"],
+						collision: false,
+						tileID: 2
+					}
+				};
+				this.Level.prototype.getBlock = function getBlock(name) {
+					for(var i in this.blocks) {
+						if('name' in this.blocks[i]) {
+							if(this.blocks[i].name.toLowerCase() == name.toLowerCase()) {
+								return this.blocks[i];
+							};
+						};
+					};
+				};
+				this.Level.prototype.show = function show(g) {
+					for(var y in this.arr) {
+						for(var x in this.arr[y]) {
+							var b = this.blocks[this.arr[y][x]],
+							    	bsizeX = this.tileSizeX,
+							    	bsizeY = this.tileSizeY;
+							g.render.context.fillStyle = b.colour[g.game.time.texture];
+							g.render.context.fillRect(x*bsizeX-g.player.position.x+g.render.width/2-1, y*bsizeY-g.player.position.y+g.render.height/2-1, bsizeX+2, bsizeY+2);
+							var coords = this.convertPosToCoords(Math.floor(g.player.position.x), Math.floor(g.player.position.y), g);
+							var point2 = {x: x, y: y};
+							var dist = g.dist(coords, point2, g);
+							var maxDist = 10;
+							g.render.context.lineWidth = (maxDist-dist)*1.25;
+							if(dist < maxDist) g.render.context.strokeRect(x*bsizeX-g.player.position.x+g.render.width/2-1, y*bsizeY-g.player.position.y+g.render.height/2-1, bsizeX+2, bsizeY+2);
+						};
+					};
+				};
+				this.dist = function dist(pt1, pt2, g) {
+					var d = Math.pow(Math.sqrt(Math.abs(pt2.x - pt1.x)) + Math.sqrt(Math.abs(pt2.y - pt1.y)), 2);
+					return d;
+				};
+				this.level = new this.Level([
+					[2,2,2,2,0,0,0,2,2,2,2,2],
+					[2,2,2,0,0,0,0,2,2,2,1,1],
+					[2,2,0,0,0,0,0,2,2,2,2,2],
+					[2,2,2,2,0,0,2,2,2,2,2,2],
+					[2,2,2,2,2,2,2,2,2,2,2,2],
+					[2,2,2,2,2,2,2,2,2,2,2,2],
+					[2,2,2,2,2,2,2,2,2,2,2,2]
+				], this);
+				this.padding = function padding(num, len, char) {
+					char = char || "0";
 					var n = num.toString();
-					if(n.length > len) {
+					if(n.length > len + 1) {
 						n = "";
 						for(var i = 0; i < len; i++) {
 							n += "9";
 						};
 					} else {
 						while(n.length < len) {
-							n = "0" + n;
+							n = char + n;
 						};
 					};
-					return n;c
+					return n;
 				};
 				this.txt = function txt(x, y, numb, colour, size) {
 					colour = colour || "#FFF";
@@ -182,7 +391,17 @@
 						'Y': [[1,0,1],[1,0,1],[1,1,1],[0,1,0],[0,1,0]],
 						'Z': [[1,1,1],[0,0,1],[0,1,0],[1,0,0],[1,1,1]],
 						':': [[0,0,0],[0,1,0],[0,0,0],[0,1,0],[0,0,0]],
-						' ': [[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0]]
+						' ': [[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0]],
+						'%': [[1,0,1],[0,0,1],[0,1,0],[1,0,0],[1,0,1]],
+						'(': [[0,1,0],[1,0,0],[1,0,0],[1,0,0],[0,1,0]],
+						')': [[0,1,0],[0,0,1],[0,0,1],[0,0,1],[0,1,0]],
+						'.': [[0,0,0],[0,0,0],[0,0,0],[0,1,0],[0,0,0]],
+						',': [[0,0,0],[0,0,0],[0,1,1],[0,1,1],[0,0,1],[0,1,0]],
+						'-': [[0,0,0],[0,0,0],[1,1,1],[0,0,0],[0,0,0]],
+						'=': [[0,0,0],[1,1,1],[0,0,0],[1,1,1],[0,0,0]],
+						'>': [[0,0,0,1,0,0],[0,0,0,1,1,0],[1,1,1,1,1,1],[0,0,0,1,1,0],[0,0,0,1,0,0]],
+						'<': [[0,0,1],[0,1,1],[1,1,1,1,1,1],[0,1,1],[0,0,1]],
+						'?': [[0,1,0],[1,0,1],[0,0,1],[0,1,0],[0,0,0],[0,1,0]]
 					};
 					this.render.context.save();
 					this.render.context.translate(x,y);
@@ -194,16 +413,20 @@
 							line ++;
 							xMinus += x*s+(i*s*4+p*s);
 						} else {
+							var sub = 0;
+							if((n[i]).match(/\?/)) {
+								sub = s*0.5;
+							};
 							for(var y in number) {
 								for(var x in number[y]) {
 									if(number[y][x] != 0) {
 										xPos = x*s+(i*s*4+p*s);
 										this.render.context.fillStyle = colour;
-										this.render.context.fillRect(xPos - xMinus,line*s*6+y*s,s,s);
+										this.render.context.fillRect(xPos - xMinus,line*s*6+y*s-sub,s,s);
 									};
 								};
 							};
-							if((n[i]).match(/(M|W)/g)) p += 2;
+							if((n[i]).match(/(M|W|\<|\>)/g)) p += 2;
 						};
 					};
 					this.render.context.restore();
@@ -216,11 +439,61 @@
 						this._.lastFpsUpdate = new Date().getTime();
 					};
 					this.render.context.clearRect(0, 0, this.render.width, this.render.height);
-					this.txt(24, 24, "SC0RE: " + this.padding(this.game.points, 8), "#FFF", 8);
-					if(this._.DEBUG) this.txt(24, 72, "FPS  :     " + this.padding(this._.framerate, 4), "#F0FFFA", 8);
-					// this.txt(24, 120, "FPS  :     " + this.padding(this._.framerate, 4), "#F0FFFA", 8);
+					this.render.context.fillStyle = '#333';
+					this.render.context.fillRect(0, 0, this.render.width, this.render.height);
+					if(this.game.health_points > 0) {
+						this.level.show(this);
+						this.player.show(this);
+						this.player.move(this);
+						this.txt(24, 24, "SC0RE:  " + this.padding(this.game.points, 8), "#FFF", 8);
+						this.txt(24, 72, "HP   :     " + this.padding(Math.floor(this.game.health_points).toString(), 4, " ") + "%", "#FFF", 8);
+						
+					} else {
+						this.txt(72, 120, "Game Over", '#F44', 24);
+						this.txt(120, 270, "Do you want to play again?", '#F44', 8);
+						this.txt(260, 370, "A > Yes", '#F44', 7);
+						this.txt(260, 418, "B > Yes", '#F44', 7);
+					};
+					if(this._.DEBUG) {
+						var playerCoords = this.level.convertPosToCoords(this.player.position.x, this.player.position.y, this);
+						var coords = [
+							this.padding(Math.floor(playerCoords.x + 1), 2, " "),
+							this.padding(Math.floor(playerCoords.y + 1), 2, " ")
+						];
+						this.txt(776, 24, "DEBUG: " + this.padding(this._.framerate, 4) + " FPS", "#F0FFFA", 8);
+						this.txt(776, 72, this.padding("", 7, " ") + "(" + coords.join(', ') + ")", "#FFF", 8);
+					};
+				};
+				this.willReset = false;
+				this.loadGame = function() {
+					this.willReset = false;
+					var loaded = localStorage.getItem("savedGame");
+					if(loaded != null && loaded != undefined && loaded) {
+						var l = JSON.parse(loaded);
+						for(var Il in l) {
+							for(var I in l[Il]) {
+								this[Il][I]=l[Il][I];
+							};
+						};
+					};
+				};
+				this.resetGameData = function resetGameData() {
+					this.willReset = true;
+					localStorage.setItem("savedGame", null);
+					this.loadGame();
+					location.reload();
+				};
+				this.saveGame = function saveGame() {
+					if(this.willReset) return localStorage.setItem("savedGame", null);
+					var saved = {};
+					saved._ = this._;
+					saved.game = this.game;
+					saved.player = {};
+					saved.player.position = this.player.position;
+					localStorage.setItem("savedGame", JSON.stringify(saved));
 				};
 				this.start = function start() {
+					this.loadGame();
 					this.render.canvas.width = this.render.width;
 					this.render.canvas.height = this.render.height;
 					window.addEventListener('keydown', (function(e) {
@@ -230,10 +503,12 @@
 						this.keyhandler(e, 0);
 					}).bind(this));
 					setInterval(this.frame.bind(this));
+					setInterval(this.saveGame.bind(this), 1000);
 				};
 			};
+			var game;
 			window.onload = function onload(e) {
-				var game = new GameInstance('canvas#game', 1280, 800);
+				game = new GameInstance('canvas#game', 1280, 800);
 				game.start();
 			};
 		</script>
@@ -244,25 +519,25 @@
 			<table id='controller_part1'>
 				<tr>
 					<td></td>
-					<td style='transform:rotate(90deg);-webkit-transform:rotate(90deg)' ontouchstart='controller.up(1)' ontouchend='controller.up(0)'>&#8249;</td>
+					<td style='transform:rotate(90deg);-webkit-transform:rotate(90deg)' ontouchstart='game.controller.up(1); event.preventDefault()' ontouchend='game.controller.up(0); event.preventDefault()' id='btn_up'c>&#8249;</td>
 					<td></td>
 				</tr>
 				<tr>
-					<td ontouchstart='controller.left(1)' ontouchend='controller.left(0)'>&#8249;</td>
+					<td ontouchstart='game.controller.left(1); event.preventDefault()' ontouchend='game.controller.left(0); event.preventDefault()' id='btn_left'>&#8249;</td>
 					<td></td>
-					<td ontouchstart='controller.right(1)' ontouchend='controller.right(0)'>&#8250;</td>
+					<td ontouchstart='game.controller.right(1); event.preventDefault()' ontouchend='game.controller.right(0); event.preventDefault()' id='btn_right'>&#8250;</td>
 				</tr>
 				<tr>
 					<td></td>
-					<td style='transform:rotate(-90deg);-webkit-transform:rotate(-90deg)' ontouchstart='controller.down(1)' ontouchend='controller.down(0)'>&#8249;</td>
+					<td style='transform:rotate(-90deg);-webkit-transform:rotate(-90deg)' ontouchstart='game.controller.down(1); event.preventDefault()' ontouchend='game.controller.down(0); event.preventDefault()' id='btn_down'>&#8249;</td>
 					<td></td>
 				</tr>
 			</table>
 			<table id='controller_part2'>
 				<tr></tr>
 				<tr>
-					<td>B</td>
-					<td>A</td>
+					<td ontouchstart='game.controller.b(1); event.preventDefault()' ontouchend='game.controller.b(0); event.preventDefault()' id='btn_b'>B</td>
+					<td ontouchstart='game.controller.a(1); event.preventDefault()' ontouchend='game.controller.a(0); event.preventDefault()' id='btn_a'>A</td>
 				</tr>
 				<tr></tr>
 			</table>
