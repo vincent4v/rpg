@@ -87,8 +87,11 @@
 		<link rel='favicon' href='rpg.png' />
 		<link rel='icon' href='rpg.png' />
 		<script>
+			var errorpromptsleft = 3;
 			window.onerror = function onerror(a,b,c,d,e) {
+				if(errorpromptsleft <= 0) return false;
 				alert(([a,b,c,d,e]).join('\n'));
+				errorpromptsleft --;
 			};
 		</script>
 		<script>
@@ -103,7 +106,7 @@
 					frames: 0,
 					framerate: 0,
 					lastFpsUpdate: new Date().getTime(),
-					
+					THREEDIMENSIONAL: !1,
 					DEBUG: !0
 				};
 				this.game = {
@@ -127,10 +130,24 @@
 						document.querySelector('#btn_b').style.background = 'rgba(0, ' + (this.player.speeding ? 127 : 0) + ', 0, 0.2)';
 					}).bind(this),
 					a: (function a(pressed) {
+						document.querySelector('#btn_a').style.background = 'rgba(0, ' + (pressed ? 127 : 0) + ', 0, 0.2)';
 						if(this.game.health_points < 0) {
 							this.resetGameData();
+						} else {
+							var en = -1;
+							for(var e = 0; e < this.enemyList.length; e++) {
+								var enemy = this.enemyList[e];
+								if(this.dist(enemy.position, this.player.position) < 1.5 * (this.player.size.width + this.player.size.height)) {
+									en = e;
+								};
+							};
+							if(en != -1) {
+								this.enemyList[en].show = this.enemyList[en].move = function() {};
+								this.enemyList[en].position.x = Infinity;
+								this.enemyList[en].position.y = Infinity;
+								this.game.points += 100;
+							};
 						};
-						document.querySelector('#btn_a').style.background = 'rgba(0, ' + (pressed ? 127 : 0) + ', 0, 0.2)';
 					}).bind(this),
 					up: (function up(pressed) {
 						this.player.velocity.y = -this.moveSpeed * pressed;
@@ -149,7 +166,11 @@
 						document.querySelector('#btn_down').style.background = 'rgba(0, ' + (pressed ? 127 : 0) + ', 0, 0.2)';
 					}).bind(this),
 				};
-				this.Entity = function Entity(x, y, colour) {
+				this.Entity = function Entity(x, y, colour, follow, str, followSpeed) {
+					this.followSpeed = followSpeed || 20;
+					this.strength = str || 15;
+					this.lastAttack = 0;
+					this.following = follow;
 					this.position = {
 						x: x || 0,
 						y: y || 0
@@ -165,35 +186,131 @@
 					this.willMove = true;
 					this.speeding = false;
 					this._ = {
-						lastMoved: new Date().getTime()
+						lastMoved: new Date().getTime(),
+						lastChecked: new Date().getTime()
 					};
 					this.colour = colour || "#09F";
 				};
 				this.Entity.prototype.standingOnCheck = function standingOnCheck(g) {
+					var timeNow = new Date().getTime();
+					var v = ((timeNow - this._.lastChecked) / 5);
 					var coords = g.level.convertPosToCoords(this.position.x, this.position.y, g);
 					var velCoord = g.level.convertPosToCoords(this.position.x+this.velocity.x, this.position.y+this.velocity.y, g);
 					var block = g.level.blocks[g.level.arr[Math.floor(coords.y)][Math.floor(coords.x)] || 0];
-					if(block.name == "Grass") {
-						g.game.health_points += (!this.speeding) ? 0.0075 : -0.02;
-					} else if(block.name == "Water") {
-						this.velocity.x /= 1.5;
-						this.velocity.y /= 1.5;
-						g.game.health_points -= 0.035;
+					if(block.name == "Water") {
+						this.velocity.x /= 1.3;
+						this.velocity.y /= 1.3;
+						if(g.player == this) g.game.health_points -= 0.075 * v;
+					} else if(block.name.includes('Warp') || block.warp == true ) {
+						if(g.level.warps && this.velocity.y == 0 && this.velocity.x == 0) {
+							for(var i in g.level.warps) {
+								for(var j in g.level.warps[i]) {
+									var warp = g.level.warps[i][j];
+									var dist = g.dist({x: warp[0], y: warp[1]}, coords);
+									if(dist < 4) {
+										setTimeout(new Function("this.position.x  = (-0.5+" + warp[2] + ") * game.level.tileSizeX;this.position.y = (-0.5+" + warp[3] + ") * game.level.tileSizeY;").bind(this), 2000);
+										g.teleportAnim = new Date().getTime() + 2000;
+									};
+								};
+							};
+						};
+					} else if(block.name == "Path") {
+						if(g.player == this) g.game.health_points += ((!this.speeding) ? 0.0075 : -0.008) * v;
+						this.velocity.x *= 1.1;
+						this.velocity.y *= 1.1;
+					} else {
+						if(g.player == this) g.game.health_points += ((!this.speeding) ? 0.0075 : -0.008) * v;
+						this.velocity.x /= 1.45;
+						this.velocity.y /= 1.45;
 					};
 					var nextBlock = g.level.blocks[g.level.arr[Math.floor(velCoord.y) || 0][Math.floor(velCoord.x)] || 0];
 					this.willMove = !nextBlock.collision;
-					if(g.game.health_points > 100) g.game.health_points = 100;
+					if(g.player == this) {
+						if(g.game.health_points > 100) g.game.health_points = 100;
+					};
+					this._.lastChecked = timeNow;
 				};
 				this.Entity.prototype.show = function(g) {
+					g.render.context.save();
+					
 					g.render.context.fillStyle = this.colour;
-					var x = g.render.width / 2 - this.size.width/2,
-					    y = g.render.height / 2 - this.size.height/2; //
+					var x = 0, y = 0;
+					if(this == g.player) {
+						x = g.render.width / 2 - this.size.width/2;
+					    	y = g.render.height / 2 - this.size.height/2; 
+					} else {
+						x = (this.position.x - this.size.width / 2) + g.render.width/2 - g.player.position.x;
+						y = (this.position.y - this.size.height / 2) + g.render.height/2 - g.player.position.y;
+					}
+					x = x || 0;
+					y = y || 0;
+					g.render.context.lineWidth = 6;
+					g.render.context.translate(x+this.size.width/2,y+this.size.height/2);
+					x = -this.size.width/2;
+					y = -this.size.height/2;
+					g.render.context.rotate((game._.THREEDIMENSIONAL) ? (Math.PI) : (new Date().getTime()/1000 % (Math.PI*2)));
+					
 					g.render.context.fillStyle = g.level.blocks[2].colour;
 					g.render.context.fillRect(x,y,this.size.width,this.size.height);
+					g.render.context.strokeStyle = 'black';
+					
+					//g.render.context.strokeRect(x,y,this.size.width,this.size.height);
+					if(g._.THREEDIMENSIONAL) {
+						g.render.context.fillStyle = 'rgba(0,0,0,0.05)';
+						for(var padding = 0; padding < this.size.width/4; padding+=2) {
+							g.render.context.fillRect(x-this.size.width/6-padding,y-this.size.height/6-padding,this.size.width,this.size.height);
+						};
+						g.render.context.beginPath();
+						g.render.context.moveTo(x + this.size.width/4, y + this.size.height/4);
+						g.render.context.lineTo(x, y);
+						g.render.context.lineTo(x + this.size.width, y);
+						g.render.context.lineTo(x + this.size.width * 1.25, y + this.size.height/4);
+						g.render.context.lineTo(x + this.size.width/4, y + this.size.height/4);
+						g.render.context.fillStyle = g.level.blocks[2].colour[0];
+						g.render.context.fill();
+						g.render.context.fillStyle = 'rgba(0,0,0,0.3)';
+						g.render.context.fill();
+						g.render.context.stroke();
+						g.render.context.beginPath();
+						g.render.context.moveTo(x + this.size.width/4, y + this.size.height/4);
+						g.render.context.lineTo(x + this.size.width/4, y + this.size.height*1.25);
+						g.render.context.lineTo(x, y + this.size.height);
+						g.render.context.lineTo(x, y);
+						g.render.context.fillStyle = g.level.blocks[2].colour[0];
+						g.render.context.fill();
+						g.render.context.fillStyle = 'rgba(0,0,0,0.5)';
+						g.render.context.fill();
+						g.render.context.stroke();
+						g.render.context.fillStyle = g.level.blocks[2].colour[0];
+						g.render.context.fillRect(x + this.size.width/4, y+this.size.height/4,this.size.width,this.size.height);
+						g.render.context.strokeRect(x + this.size.width/4+2,2+y+this.size.height/4,this.size.width,this.size.height);
+						g.render.context.beginPath();
+						g.render.context.moveTo(x + this.size.width/4, y + this.size.height/4);
+						g.render.context.lineTo(x, y);
+						g.render.context.stroke();
+					};
+					
+					g.render.context.restore();
 				};
 				this.Entity.prototype.move = function(g) {
 					var timeNow = new Date().getTime();
 					var v = ((timeNow - this._.lastMoved) / 50);
+					if(this.following != undefined && this.following.position) {
+						var dist = g.dist(this.following.position, this.position);
+						if(dist < window.innerWidth) {
+							this.velocity.x = this.following.position.x > this.position.x ?
+											(this.followSpeed) : (-this.followSpeed);
+							this.velocity.y = this.following.position.y > this.position.y ?
+											(this.followSpeed) : (-this.followSpeed);
+						} else {
+							this.velocity.x = 0;
+							this.velocity.y = 0;
+						}
+						if((new Date().getTime()-this.lastAttack) > 750 && dist < this.size.width) {
+							this.lastAttack = new Date().getTime();
+							g.game.health_points -= this.strength;
+						};
+					};
 					this.standingOnCheck(g);
 					if(this.willMove){
 						this.position.x += this.velocity.x * v * (this.speeding ? 1.25 : 1);
@@ -205,7 +322,24 @@
 					} else {};
 					this._.lastMoved = timeNow;
 				};
-				this.player = new this.Entity(this.render.width, this.render.height, "#0F9");
+				this.teleportAnim = false;
+				this.player = new this.Entity(this.render.width, this.render.height, location.hash || "#0F9", 25);
+				this.enemyList = [
+					new this.Entity(this.render.width * 1.75, this.render.height * 2, "#900", this.player, 10, this.moveSpeed * 1.05),
+					new this.Entity(this.render.width * 3.75, this.render.height * 2, "#700", this.player, 12, this.moveSpeed * 1.10),
+					new this.Entity(this.render.width * 4.25, this.render.height * 5, "#500", this.player, 14, this.moveSpeed * 1.15),
+					new this.Entity(this.render.width * 4.00, this.render.height * 5, "#500", this.player, 14, this.moveSpeed * 1.15),
+					new this.Entity(this.render.width * 3.75, this.render.height * 5, "#500", this.player, 14, this.moveSpeed * 1.15),
+					new this.Entity(this.render.width * 3.25, this.render.height * 5, "#500", this.player, 14, this.moveSpeed * 1.15),
+					new this.Entity(this.render.width * 3.00, this.render.height * 5, "#300", this.player, 18, this.moveSpeed * 1.20),
+					new this.Entity(this.render.width * 2.75, this.render.height * 5, "#300", this.player, 18, this.moveSpeed * 1.20),
+					new this.Entity(this.render.width * 2.25, this.render.height * 5, "#300", this.player, 18, this.moveSpeed * 1.20),
+					new this.Entity(this.render.width * 2.00, this.render.height * 5, "#300", this.player, 18, this.moveSpeed * 1.20),
+					new this.Entity(this.render.width * 1.75, this.render.height * 5, "#100", this.player, 25, this.moveSpeed * 1.25),
+					new this.Entity(this.render.width * 1.25, this.render.height * 5, "#100", this.player, 25, this.moveSpeed * 1.25),
+					new this.Entity(this.render.width * 1.00, this.render.height * 5, "#100", this.player, 25, this.moveSpeed * 1.25),
+					new this.Entity(this.render.width * 0.75, this.render.height * 5, "#100", this.player, 25, this.moveSpeed * 1.25)
+				];
 				this.constrain = function constrain(num, min, max) {
 					if(num > max) num = max;
 					if(num < min) num = min;
@@ -235,7 +369,11 @@
 							evt.preventDefault();
 							this.controller.a(pressed+0);
 						};
-					} else if(!!pressed) {
+						if(!!pressed && evt.key == "3") {
+							evt.preventDefault();
+							this._.THREEDIMENSIONAL = !this._.THREEDIMENSIONAL;
+						};
+					}  else if(!!pressed) {
 						if(evt.key == "0") {
 							evt.preventDefault();
 							if(this._.DEBUG) this.resetGameData();
@@ -257,14 +395,21 @@
 						};
 					};
 				};
-				this.Level = function Level(arr, g) {
+				this.loadFileSync = function loadFileSync(url) {
+					var xml = new XMLHttpRequest();
+					xml.open("GET", url, false);
+					xml.send();
+					return xml.responseText;
+				};
+				this.Level = function Level(arr, g, warps) {
 					this.arr = arr;
 					this.sizeX = arr[0].length;
 					this.sizeY = arr.length;
 					this.onscreenX = 7;
-					this.onscreenY = 4;
+					this.onscreenY = 5;
 					this.tileSizeX = (g.render.width / this.onscreenX);
 					this.tileSizeY = (g.render.height / this.onscreenY);
+					this.warps = warps;
 				};
 				this.Level.prototype.convertPosToCoords = function convertPosToCoords(posX, posY, g) {
 					return {
@@ -277,19 +422,50 @@
 						name: "Water",
 						colour: ["#09F", "#039"],
 						collision: false,
+						warp: false,
 						tileID: 0
 					},
 					1: {
 						name: "Stone",
 						colour: ["#99A", "#445"],
 						collision: true,
+						warp: false,
 						tileID: 1
 					},
 					2: {
 						name: "Grass",
 						colour: ["#0A3", "#051"],
 						collision: false,
+						warp: false,
 						tileID: 2
+					},
+					3: {
+						name: "Black Hole (Warp)",
+						colour: ["#000", "#000"],
+						collision: false,
+						warp: true,
+						tileID: 3
+					},
+					4: {
+						name: "Path",
+						colour: ["#073", "#114"],
+						collision: false,
+						warp: false,
+						tileID: 4
+					},
+					5: {
+						name: "Deep Water",
+						colour: ["#07D", "#027"],
+						collision: true,
+						warp: false,
+						tileID: 5
+					},
+					6: {
+						name: "Brick",
+						colour: ["#710", "#410"],
+						collision: true,
+						warp: false,
+						tileID: 6
 					}
 				};
 				this.Level.prototype.getBlock = function getBlock(name) {
@@ -322,15 +498,13 @@
 					var d = Math.pow(Math.sqrt(Math.abs(pt2.x - pt1.x)) + Math.sqrt(Math.abs(pt2.y - pt1.y)), 2);
 					return d;
 				};
-				this.level = new this.Level([
-					[2,2,2,2,0,0,0,2,2,2,2,2],
-					[2,2,2,0,0,0,0,2,2,2,1,1],
-					[2,2,0,0,0,0,0,2,2,2,2,2],
-					[2,2,2,2,0,0,2,2,2,2,2,2],
-					[2,2,2,2,2,2,2,2,2,2,2,2],
-					[2,2,2,2,2,2,2,2,2,2,2,2],
-					[2,2,2,2,2,2,2,2,2,2,2,2]
-				], this);
+				this.tmp = JSON.parse(this.loadFileSync('level.json'));
+				this.level = new this.Level(this.tmp.level, this, this.tmp.warps);
+				try {
+					delete this.tmp;
+				} catch(e) {
+					this.tmp = undefined;
+				};
 				this.padding = function padding(num, len, char) {
 					char = char || "0";
 					var n = num.toString();
@@ -401,7 +575,8 @@
 						'=': [[0,0,0],[1,1,1],[0,0,0],[1,1,1],[0,0,0]],
 						'>': [[0,0,0,1,0,0],[0,0,0,1,1,0],[1,1,1,1,1,1],[0,0,0,1,1,0],[0,0,0,1,0,0]],
 						'<': [[0,0,1],[0,1,1],[1,1,1,1,1,1],[0,1,1],[0,0,1]],
-						'?': [[0,1,0],[1,0,1],[0,0,1],[0,1,0],[0,0,0],[0,1,0]]
+						'?': [[0,1,0],[1,0,1],[0,0,1],[0,1,0],[0,0,0],[0,1,0]],
+						'*': [[0,1,0],[1,1,1],[0,1,0],[1,0,1],[0,0,0]]
 					};
 					this.render.context.save();
 					this.render.context.translate(x,y);
@@ -414,7 +589,7 @@
 							xMinus += x*s+(i*s*4+p*s);
 						} else {
 							var sub = 0;
-							if((n[i]).match(/\?/)) {
+							if((n[i]).match(/\?|\*/)) {
 								sub = s*0.5;
 							};
 							for(var y in number) {
@@ -444,7 +619,27 @@
 					if(this.game.health_points > 0) {
 						this.level.show(this);
 						this.player.show(this);
-						this.player.move(this);
+						if(this.teleportAnim == false) {
+							for(var e = 0; e < this.enemyList.length; e++) {
+								enemy = this.enemyList[e];
+								enemy.move(this);
+							};
+							this.player.move(this);
+							for(var e = 0; e < this.enemyList.length; e++) {
+								enemy = this.enemyList[e];
+								enemy.show(this);
+							};
+						} else {
+							this.player.velocity.y = 0;
+							this.player.velocity.x = 0;
+							var num = 1-Math.abs(0.5-Math.abs(((this.teleportAnim - new Date().getTime())/1000)));
+							var transparency = (num + 0.5).toString().replace(/(0|)\./g, "0.");
+							this.render.context.fillStyle = 'rgba(0, 0, 0, ' + transparency + ')';
+							this.render.context.fillRect(0, 0, this.render.width, this.render.height);
+							if(this.teleportAnim - new Date().getTime() < 0) {
+								this.teleportAnim = false;
+							};
+						}
 						this.txt(24, 24, "SC0RE:  " + this.padding(this.game.points, 8), "#FFF", 8);
 						this.txt(24, 72, "HP   :     " + this.padding(Math.floor(this.game.health_points).toString(), 4, " ") + "%", "#FFF", 8);
 						
@@ -452,7 +647,7 @@
 						this.txt(72, 120, "Game Over", '#F44', 24);
 						this.txt(120, 270, "Do you want to play again?", '#F44', 8);
 						this.txt(260, 370, "A > Yes", '#F44', 7);
-						this.txt(260, 418, "B > Yes", '#F44', 7);
+						this.txt(260, 418, "B > No", '#F44', 7);
 					};
 					if(this._.DEBUG) {
 						var playerCoords = this.level.convertPosToCoords(this.player.position.x, this.player.position.y, this);
@@ -460,8 +655,11 @@
 							this.padding(Math.floor(playerCoords.x + 1), 2, " "),
 							this.padding(Math.floor(playerCoords.y + 1), 2, " ")
 						];
+						var block = (this.level.blocks[this.level.arr[Math.floor(playerCoords.y)][Math.floor(playerCoords.x)]] || {}).name || "Unknown";
+						block = block.replace(/ \(WARP\)/gi, "*");
 						this.txt(776, 24, "DEBUG: " + this.padding(this._.framerate, 4) + " FPS", "#F0FFFA", 8);
-						this.txt(776, 72, this.padding("", 7, " ") + "(" + coords.join(', ') + ")", "#FFF", 8);
+						this.txt(776, 76, this.padding("", 7, " ") + "(" + coords.join(', ') + ")", "#FFF", 8);
+						this.txt(776, 128, this.padding(block, 15, " "), "#FFF", 8);
 					};
 				};
 				this.willReset = false;
@@ -502,7 +700,7 @@
 					window.addEventListener('keyup', (function(e) {
 						this.keyhandler(e, 0);
 					}).bind(this));
-					setInterval(this.frame.bind(this));
+					setInterval(this.frame.bind(this),0);
 					setInterval(this.saveGame.bind(this), 1000);
 				};
 			};

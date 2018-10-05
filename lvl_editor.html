@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>RPG Map Editor</title>
+		<style>
+			body, html, canvas {
+				padding: 0;
+				margin: 0;
+				width: 100vw;
+				height: 100vh;
+			}
+			.itm {
+				font-size: 2vh;
+				width: 1vw;
+				height: 2.5vh;
+				display: inline-block;
+			}
+			.itm0 {
+				color: #039;
+				background: #09F;
+			}
+			.itm1 {
+				color: #445;
+				background: #99A;
+			}
+			.itm2 {
+				color: #051;
+				background: #0A3;
+			}
+			.itm3 {
+				color: #666;
+				background: #000;
+			}
+			.itm4 {
+				color: #999;
+				background: #777;
+			}
+			.itm5 {
+				color: #710;
+				background: #410;
+			}
+		</style>
+		<script>
+			window.onerror = function(a,b,c,d,e) {
+				var a = [a,b,c,d,e];
+				alert(a.join());
+				window.onerror = console.log(a.join());
+			};
+		</script>
+		<script>
+			var blocks = {
+					0: {
+						name: "Water",
+						colour: ["#09F", "#039"],
+						collision: false,
+						warp: false,
+						tileID: 0
+					},
+					1: {
+						name: "Stone",
+						colour: ["#99A", "#445"],
+						collision: true,
+						warp: false,
+						tileID: 1
+					},
+					2: {
+						name: "Grass",
+						colour: ["#0A3", "#051"],
+						collision: false,
+						warp: false,
+						tileID: 2
+					},
+					3: {
+						name: "Black Hole (Warp)",
+						colour: ["#000", "#000"],
+						collision: false,
+						warp: true,
+						tileID: 3
+					},
+					4: {
+						name: "Path",
+						colour: ["#073", "#114"],
+						collision: false,
+						warp: false,
+						tileID: 4
+					},
+					5: {
+						name: "Deep Water",
+						colour: ["#07D", "#027"],
+						collision: true,
+						warp: false,
+						tileID: 5
+					},
+					6: {
+						name: "Brick",
+						colour: ["#710", "#410"],
+						collision: true,
+						warp: false,
+						tileID: 6
+					},
+					length: 7
+				};
+			var level = [];
+			window.onload = function onload(e) {
+				var c = document.querySelector('textarea');
+				var d = document.querySelector('div');
+				setInterval(()=>{
+					level = JSON.parse(c.value);
+					c.value = c.value.replace(/\],( |)\[/g, "],\n[");
+					d.innerHTML = JSON.stringify(level);
+					for(var i = blocks.length - 1; i >= 0; i--) {
+						d.innerHTML = d.innerHTML.replace(new RegExp(blocks[i].tileID, "g"), "<a style='color: " + (blocks[i].colour[1]) + ";background:" + blocks[i].colour[0] + ";' class='itm itm" + blocks[i].tileID + "'>"+blocks[i].tileID+"</a>");
+					}
+					d.innerHTML = d.innerHTML.replace(/\],/g, "],<br/>").replace(/\[\[/g,"[<br/>[").replace(/\]\]/g, "]<br/>]");
+				},200);
+			};
+		</script>
+	</head>
+	<body>
+		<textarea style='width:49vw;height:90vh;display:inline-block;position:absolute;left:0;top:0;'>[]</textarea>
+		<div style='width:49vw; height: 90vh;background:#999;display:inline-block;position:absolute;right:0;top:0;overflow-y:scroll'></div>
+	</body>
+</html>
