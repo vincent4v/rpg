@@ -2,6 +2,12 @@
 <html>
 	<head>
 		<title>RPG Game Thing</title>
+		<!-- Alert box to turn device to landscape -->
+		<script>
+		if(window.innerHeight > window.innerWidth){
+    		alert("Turn Your Device to Play this Game!");
+		}
+			</script>
 		<style>
 			@keyframes hideController {
 				0% {
@@ -79,6 +85,18 @@
 				text-align: center;
 			}
 		</style>
+		
+		<!-- For Mobile Web App Titles and Startup Images (If you want to host the startup images, you can. -->
+		<meta name="apple-mobile-web-app-title" content="RPG Game">
+		<meta name="application-name" content="RPG Game">
+		<link href="https://vocalv.ml/jdev/splashscreens/iphone5_splash.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image" />
+        	<link href="https://vocalv.ml/jdev/splashscreens/iphone6_splash.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image" />
+        	<link href="https://vocalv.ml/jdev/splashscreens/iphoneplus_splash.png" media="(device-width: 621px) and (device-height: 1104px) and (-webkit-device-pixel-ratio: 3)" rel="apple-touch-startup-image" />
+        	<link href="https://vocalv.ml/jdev/splashscreens/iphonex_splash.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" rel="apple-touch-startup-image" />
+        	<link href="https://vocalv.ml/jdev/splashscreens/ipad_splash.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image" />
+        	<link href="https://vocalv.ml/jdev/splashscreens/ipadpro1_splash.png" media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image" />
+        	<link href="https://vocalv.ml/jdev/splashscreens/ipadpro2_splash.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image" />
+		
 		<meta name='mobile-web-app-capable' content='yes' />
 		<meta name='apple-mobile-web-app-capable' content='yes' />
 		<meta name='apple-mobile-web-app-status-bar-style' content='black' />
@@ -717,6 +735,7 @@
 			<table id='controller_part1'>
 				<tr>
 					<td></td>
+					<!-- I got an error for this text below, not sure why? -->
 					<td style='transform:rotate(90deg);-webkit-transform:rotate(90deg)' ontouchstart='game.controller.up(1); event.preventDefault()' ontouchend='game.controller.up(0); event.preventDefault()' id='btn_up'c>&#8249;</td>
 					<td></td>
 				</tr>
